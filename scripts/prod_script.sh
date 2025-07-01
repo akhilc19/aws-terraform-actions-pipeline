@@ -14,7 +14,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 cd /home/ubuntu
 git clone https://github.com/techeazy-consulting/techeazy-devops app
 cd app
-git checkout HEAD~1 # Latest commit in repo has bug two @GetMapping("/")
+# git checkout HEAD~1 # Latest commit in repo has bug two @GetMapping("/")
 
 # Build the application
 mvn package
