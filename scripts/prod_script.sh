@@ -21,3 +21,5 @@ mvn package
 
 # Run the app in background and redirect output
 nohup java -jar target/techeazy-devops-0.0.1-SNAPSHOT.jar > /home/ubuntu/app.log 2>&1 &
+
+shutdown -h +10

@@ -37,4 +37,3 @@ curl "http://$RAW_INSTANCE_IP:80"
 
 echo "[+] Instance Public IP: $RAW_INSTANCE_IP"
 
-shutdown -h +$(var.shutdown_minutes)
