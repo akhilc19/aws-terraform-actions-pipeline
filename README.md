@@ -48,7 +48,7 @@ aws configure
 You'll be prompted to input your:
 - AWS Access Key ID
 - AWS Secret Access Key
-- Default region name (e.g., `us-east-1`)
+- Default region name (e.g., `ap-south-1`)
 - Default output format (e.g., `json`)
 
 ### Option 2: Set environment variables directly
@@ -56,7 +56,7 @@ You'll be prompted to input your:
 ```bash
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_REGION=ap-south-1
 ```
 
 ---
