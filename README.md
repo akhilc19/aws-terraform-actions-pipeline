@@ -141,6 +141,7 @@ http://<ec2-public-ip>:80
 To enable **log pulling from EC2 to your local machine,** follow these steps:
 
 1. **Uncomment Lines in the Script:**
+   *This step is only if you want logs to be fetched from s3 to your local directory*
    Locate the following lines in your deployment script between **lines 52–59** and uncomment them:
 
    ```bash
