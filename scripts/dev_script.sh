@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+
 
 # Update system and install dependencies
 apt-get update -y
@@ -26,13 +26,11 @@ mvn clean package
 # Run the Java app
 nohup java -jar target/*.jar --server.port=80 > /var/log/my-app.log 2>&1 &
 
-# Wait for the app to start
-sleep 30
 
 # Upload Logs to S3
-aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/system/
-aws s3 cp /var/log/my-app.log s3://${s3_bucket_name}/app/
+sudo aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/system/
+sudo aws s3 cp /var/log/my-app.log s3://${s3_bucket_name}/app/
 
 # Shutdown after timeout
-sudo shutdown -h +${shutdown_minutes}
+# sudo shutdown -h +${shutdown_minutes}
 
