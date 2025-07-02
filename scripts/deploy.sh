@@ -37,5 +37,7 @@ curl "http://$RAW_INSTANCE_IP:80"
 
 echo "[+] Instance Public IP: $RAW_INSTANCE_IP"
 
-sleep 650
-terraform destroy -var-file="$CONFIG_FILE" -auto-approve
+
+# sleep 650
+
+# terraform destroy -var-file="$CONFIG_FILE" -auto-approve

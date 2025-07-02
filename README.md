@@ -8,17 +8,17 @@ This project automates the provisioning of an EC2 instance and the deployment of
 
 ```
 tech_eazy_devops_git-user-9/
-├── README.md
-├── terraform/
-│   ├── main.tf
-│   ├── outputs.tf
-│   ├── variables.tf
-│   ├── dev_config.tfvars
-│   └── prod_config.tfvars
-└── scripts/
-    ├── deploy.sh
-    ├── dev_script.sh
-    └── prod_script.sh
+├── README.md                  # Project documentation
+├── terraform/                 # Contains Terraform configurations
+│   ├── main.tf                # Main Terraform configuration file
+│   ├── outputs.tf             # Defines Terraform outputs (e.g., EC2 public IP)
+│   ├── variables.tf           # Declares input variables for Terraform
+│   ├── dev_config.tfvars      # Terraform variable values for the 'dev' environment
+│   └── prod_config.tfvars     # Terraform variable values for the 'prod' environment
+└── scripts/                   # Shell scripts for deployment and configuration
+    ├── deploy.sh              # Automates the Terraform apply process for a given environment
+    ├── dev_script.sh          # User-data script for configuring EC2 in the 'dev' environment
+    └── prod_script.sh         # User-data script for configuring EC2 in the 'prod' environment
 ```
 
 ---
@@ -66,8 +66,8 @@ export AWS_DEFAULT_REGION=ap-south-1
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd tech_eazy_devops_git-user-9
+git clone https://github.com/git-user-9/tech_eazy_devops_git-user-9.git app
+cd app
 ```
 
 ### 2️⃣ Run the Deployment Script
@@ -81,6 +81,8 @@ The script will:
 - Load the corresponding Terraform variable file
 - Initialize and apply the Terraform configuration
 - Output the public IP of the created EC2 instance
+- Upload logs to S3 bucket
+- Shutdown the instance after 10-15 minutes (configurable)
 
 ### 3️⃣ Access the Application
 
@@ -100,9 +102,11 @@ http://<your-ec2-ip>:80
 
 ### User Data (inside shell script):
 - Updates the system
-- Installs Java 21, Git, and Maven
+- Installs AWS CLI, curl, unzip, Java 21, Git, and Maven
 - Clones and builds your application
 - Launches the application on port 80
+- Uploads logs to S3 bucket
+- Shuts down the instance after 10-15 minutes (configurable)
 
 ---
 
@@ -117,7 +121,7 @@ http://<your-ec2-ip>:80
 ## 💬 **FAQ**
 
 **Q: Can I deploy to a different AWS region?**  
-Yes. Modify the `region` value in `terraform/main.tf` or export `AWS_DEFAULT_REGION`.
+Yes. Modify the `aws_region` value in `terraform/variables.tf`, `dev_config.tfvars` and `prod_config.tfvars`
 
 
 

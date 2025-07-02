@@ -1,25 +1,38 @@
 #!/bin/bash
 set -e
 
-# Update and install dependencies
+# Update system and install dependencies
 apt-get update -y
-apt-get install -y openjdk-21-jdk maven git
+apt-get install -y unzip curl git openjdk-21-jdk maven
+
+# Install AWS CLI v2
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
 
 # Set JAVA_HOME
 export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
 echo "export JAVA_HOME=$JAVA_HOME" >> /etc/profile
 export PATH=$JAVA_HOME/bin:$PATH
 
-# Clone the repo
 cd /home/ubuntu
-git clone https://github.com/techeazy-consulting/techeazy-devops app
+git clone ${repo_url} app
+#git checkout HEAD~1 # Latest commit in repo has bug two @GetMapping("/")
+
 cd app
-# git checkout HEAD~1 # Latest commit in repo has bug two @GetMapping("/")
+mvn clean package
 
-# Build the application
-mvn package
+# Run the Java app
+nohup java -jar target/*.jar --server.port=80 > /var/log/my-app.log 2>&1 &
 
-# Run the app in background and redirect output
-nohup java -jar target/techeazy-devops-0.0.1-SNAPSHOT.jar > /home/ubuntu/app.log 2>&1 &
+# Wait for the app to start
+sleep 30
 
-shutdown -h +10
+# Upload Logs to S3
+aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/system/
+aws s3 cp /var/log/my-app.log s3://${s3_bucket_name}/app/
+
+# Shutdown after timeout
+sudo shutdown -h +${shutdown_minutes}
+
