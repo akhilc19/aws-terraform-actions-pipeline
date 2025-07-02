@@ -1,4 +1,5 @@
 # Role A: Read-Only Access to S3
+
 resource "aws_iam_role" "role_a_readonly" {
   name = "readonly_s3_role"
 
@@ -6,15 +7,14 @@ resource "aws_iam_role" "role_a_readonly" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow",
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/uploadonly_s3_role"
-        },
-        Action = "sts:AssumeRole"
+        Effect    = "Allow",
+        Principal = { Service = "ec2.amazonaws.com" },
+        Action    = "sts:AssumeRole"
       }
     ]
   })
 }
+
 
 resource "aws_iam_policy" "readonly_policy" {
   name        = "readonly_s3_policy"
@@ -67,7 +67,7 @@ resource "aws_iam_policy" "uploadonly_policy" {
       },
       {
         Effect   = "Deny",
-        Action   = ["s3:GetBucket"],
+        Action   = ["s3:GetObject", "s3:ListBucket"],
         Resource = ["arn:aws:s3:::*"]
       },
       {

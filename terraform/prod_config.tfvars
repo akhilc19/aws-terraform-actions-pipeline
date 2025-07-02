@@ -1,7 +1,9 @@
-instance_type    = "t2.micro"
-key_name         = "ssh-key-ec2"
-stage            = "Prod"
-shutdown_minutes = 15
-s3_bucket_name   = "techeazy-logs-prod-unique123sss" # Change this!
-aws_region       = "ap-south-1"
-repo_url         = "https://github.com/techeazy-consulting/techeazy-devops"
+instance_type     = "t2.micro"
+key_name          = "ssh-key-ec2" #change this to your key-pair name
+ami_id            = "ami-0f918f7e67a3323f0"
+stage             = "prod"
+shutdown_minutes  = 15
+s3_bucket_name    = "techeazy-logs-dev-unique123ss" # Change this!
+aws_region        = "ap-south-1"
+repo_url          = "https://github.com/techeazy-consulting/techeazy-devops"
+verifier_lifetime = 25

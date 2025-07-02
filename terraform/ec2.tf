@@ -31,13 +31,13 @@ resource "aws_security_group" "web_sg" {
 }
 
 # EC2 Instance
+# Application EC2 Instance
 resource "aws_instance" "app" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
   key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_instance_profile_b.name
-
 
   user_data = templatefile("${path.module}/../scripts/${lower(var.stage)}_script.sh", {
     s3_bucket_name   = var.s3_bucket_name
@@ -50,4 +50,28 @@ resource "aws_instance" "app" {
     Name  = "TecheazyApp-${var.stage}"
     Stage = var.stage
   }
+}
+
+# Log Verifier EC2 Instance
+resource "aws_instance" "log_verifier" {
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_instance_profile_a.name
+
+  # Instantiate verifier script after app finishes
+  user_data = templatefile("${path.module}/../scripts/verify_logs_script.sh", {
+    s3_bucket_name = var.s3_bucket_name
+    aws_region     = var.aws_region
+    fetch_timeout  = var.verifier_lifetime
+    # local_copy_path = "/mylogs"
+  })
+
+  tags = {
+    Name  = "TecheazyVerifier-${var.stage}"
+    Stage = var.stage
+  }
+
+  depends_on = [aws_instance.app] # Wait until app deployment is complete
 }

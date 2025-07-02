@@ -6,13 +6,18 @@ output "s3_log_bucket" {
   value       = aws_s3_bucket.log_s3_bucket.id
 }
 
-output "iam_role_a_arn" {
-  description = "ARN of IAM Role A (read access to S3)"
-  value       = aws_iam_role.role_a_readonly.arn
+output "verifier_instance_public_ip" {
+  value = aws_instance.log_verifier.public_ip
 }
 
-output "iam_role_b_arn" {
-  description = "ARN of IAM Role B (attached to EC2 instance)"
-  value       = aws_iam_role.role_b_uploader.arn
-}
+# output "iam_role_a_arn" {
+#   description = "ARN of IAM Role A (read access to S3)"
+#   value       = aws_iam_role.role_a_readonly.arn
+# }
+
+# output "iam_role_b_arn" {
+#   description = "ARN of IAM Role B (attached to EC2 instance)"
+#   value       = aws_iam_role.role_b_uploader.arn
+# }
+
 

@@ -26,14 +26,19 @@ variable "repo_url" {
 variable "s3_bucket_name" {
   description = "S3 bucket name for logs (must be globally unique)"
   type        = string
-  default     = "techeazy-logs-bucket-39u2390423"
+  default     = "techeazy-logs-dev-unique123ss"
   validation {
     condition     = length(var.s3_bucket_name) > 0
     error_message = "S3 bucket name cannot be empty."
   }
 }
 variable "shutdown_minutes" {
-  description = "Auto-shutdown timer in minutes"
+  description = "Shutdown timer for main instance"
   type        = number
-  default     = 10
+  default     = 25
+}
+variable "verifier_lifetime" {
+  description = "Shutdown timer for verifier instance"
+  type        = number
+  default     = 25
 }
