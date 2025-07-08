@@ -21,7 +21,7 @@ echo "Fetching logs from S3 Bucket: ${s3_bucket_name}"
 # sudo aws s3 sync s3://techeazy-logs-dev-unique123ss /mylogs
 # sudo aws s3 sync s3://${s3_bucket_name} /mylogs/ 
 
-echo "Waiting for logs to appear in S3 bucket: techeazy-logs-dev-unique123ss"
+echo "Waiting for logs to appear in S3 bucket: ${s3_bucket_name}"
 sleep 100
 MAX_RETRIES=20
 RETRY_DELAY=30  # seconds

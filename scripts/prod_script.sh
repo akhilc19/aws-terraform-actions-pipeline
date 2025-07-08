@@ -1,9 +1,8 @@
 #!/bin/bash
-set -e
 
 # Update system and install dependencies
 apt-get update -y
-apt-get install -y unzip curl git openjdk-21-jdk maven
+apt-get install -y unzip git openjdk-21-jdk maven
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -27,7 +26,7 @@ mvn clean package
 nohup java -jar target/*.jar --server.port=80 > /var/log/my-app.log 2>&1 &
 
 # Wait for the app to start
-sleep 30
+sleep 5
 
 # Upload Logs to S3
 aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/system/

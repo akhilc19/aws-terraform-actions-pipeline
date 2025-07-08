@@ -55,11 +55,18 @@ echo "Verified Public IP: $VERIFIER_IP"
 # cd .. # to save logs at root level
 # PRIVATE_KEY_PATH="/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem" #change this to your ssh private key path, also make sure to use `chmod 400` on your key before using
 # echo "trying to scp logs to local"
-# scp -r -i "$PRIVATE_KEY_PATH" ubuntu@$VERIFIER_IP:/mylogs/ .   #to pull logs from readonly ec2 to your local directory /mylogs/
+# scp -r -i "$PRIVATE_KEY_PATH" -o StrictHostKeyChecking=no ubuntu@$VERIFIER_IP:/mylogs/ .   #to pull logs from readonly ec2 to your local directory /mylogs/
 # cd $TERRAFORM_DIR # to run destroy need to go to terraform directory
 
-echo "Terraform destroy will run after 10minutes..."
+echo -e "\n"
+echo "[+] Using curl on app at http://$RAW_INSTANCE_IP:80"
+echo -e "\n"
+curl "http://$RAW_INSTANCE_IP:80"
+echo -e "\n"
+echo -e "\n"
+
+echo "Terraform destroy will run after 2 minutes..."
 echo "You can press ctrl+c and do it earlier as well"
-sleep 650
+sleep 120
 
 terraform destroy -var-file="$CONFIG_FILE" -auto-approve
