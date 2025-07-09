@@ -1,4 +1,4 @@
-name: EC2 Deploy 
+name: EC2 Deploy
 
 on:
   push:
@@ -6,7 +6,6 @@ on:
       - devops/a3
     tags:
       - deploy-dev
-      - deploy-qa
       - deploy-prod
 
   workflow_dispatch:
@@ -18,7 +17,6 @@ on:
         type: choice
         options:
           - dev
-          - qa
           - prod
 
 env:
@@ -47,61 +45,52 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
-    # Determin Stage - dev/prod/qa defaults to dev
-    # - name: Determine Stage
-    #   id: set_stage
-    #   run: |
-    #     if [[ "${GITHUB_REF}" == "refs/tags/deploy-dev" ]]; then
-    #       echo "STAGE=dev" >> $GITHUB_ENV
-    #     elif [[ "${GITHUB_REF}" == "refs/tags/deploy-qa" ]]; then
-    #       echo "STAGE=qa" >> $GITHUB_ENV
-    #     elif [[ "${GITHUB_REF}" == "refs/tags/deploy-prod" ]]; then
-    #       echo "STAGE=prod" >> $GITHUB_ENV
-    #     elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-    #       echo "STAGE=${{ github.event.inputs.stage }}" >> $GITHUB_ENV
-    #     else
-    #       echo "STAGE=dev" >> $GITHUB_ENV  # default fallback
-    #     fi
+    # Determine Stage - dev/prod defaults to dev
+    - name: Determine Stage
+      id: set_stage
+      run: |
+        if [[ "${GITHUB_REF}" == "refs/tags/deploy-dev" ]]; then
+          echo "STAGE=dev" >> $GITHUB_ENV
+        elif [[ "${GITHUB_REF}" == "refs/tags/deploy-prod" ]]; then
+          echo "STAGE=prod" >> $GITHUB_ENV
+        elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          echo "STAGE=${{ github.event.inputs.stage }}" >> $GITHUB_ENV
+        else
+          echo "STAGE=dev" >> $GITHUB_ENV  # fallback
+        fi
 
-    #     echo "🛠️ Deployment stage: $STAGE"
+        echo "🛠️ Deployment stage: $STAGE"
 
     # Terraform Init & Workspace
     - name: Terraform Init & Workspace
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
         terraform init
-        terraform workspace select ${{ github.event.inputs.stage }} || terraform workspace new ${{ github.event.inputs.stage }}
+        terraform workspace select ${STAGE} || terraform workspace new ${STAGE}
 
     # Terraform Apply
     - name: Terraform Apply
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve \
-          -var "stage=${{ github.event.inputs.stage }}"
+        terraform apply -var-file="${STAGE}_config.tfvars" -auto-approve \
+          -var "stage=${STAGE}"
 
     # Output and inject EC2 IPs & S3 Bucket name to Github Env
     - name: Get EC2s Public IPs & S3 Bucket Name
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
         echo "Injecting terraform outputs to github environment"
-        # echo "INSTANCE_IP=$(terraform output -raw instance_public_ip)" >> $GITHUB_ENV
-        # echo "VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)" >> $GITHUB_ENV
-        # echo "S3_BUCKET=$(terraform output -raw s3_log_bucket)" >> $GITHUB_ENV
-        # Assign to local shell variables
         INSTANCE_IP=$(terraform output -raw instance_public_ip)
         VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
         S3_BUCKET=$(terraform output -raw s3_log_bucket)
 
-        # Write to GitHub Actions ENV for later steps
         echo "INSTANCE_IP=$INSTANCE_IP" >> $GITHUB_ENV
         echo "VERIFIER_IP=$VERIFIER_IP" >> $GITHUB_ENV
         echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
 
-        # Echo both for current step & confirmation
         echo "📦 App IP (Shell): $INSTANCE_IP"
         echo "🔑 Verifier IP (Shell): $VERIFIER_IP"
         echo "🪣 S3 Bucket (Shell): $S3_BUCKET"
-
 
     # Wait for App Initialization
     - name: Wait for App Initialization
@@ -112,9 +101,12 @@ jobs:
     # Validate App Health
     - name: Validate App Health
       run: |
+        echo -e "\n📦 Full Response from App:\n"
+        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
+        echo -e "\n"
         echo "Checking app health at http://${{ env.INSTANCE_IP }}:80"
         for i in {1..10}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://$INSTANCE_IP:80)
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ env.INSTANCE_IP }}:80)
           if [[ "$STATUS" == "200" ]]; then
             echo "✅ App is healthy (HTTP 200)"
             exit 0
@@ -126,32 +118,28 @@ jobs:
         echo "❌ App failed health check"
         exit 1
 
-        echo -e "\n📦 Full Response from App:\n"
-        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
-        echo -e "\n"
-
     # Verify Logs in S3
     - name: Verify Logs in S3
       run: |
         echo "📦 Checking for logs in S3 bucket: $S3_BUCKET"
-        aws s3 ls s3://$S3_BUCKET/system/cloud-init.log || { echo "❌ system logs missing"; exit 1; }
-        aws s3 ls s3://$S3_BUCKET/app/my-app.log || { echo "❌ app logs missing"; exit 1; }
+        aws s3 ls s3://$S3_BUCKET/${STAGE}/system/cloud-init.log || { echo "❌ system logs missing"; exit 1; }
+        aws s3 ls s3://$S3_BUCKET/${STAGE}/app/my-app.log || { echo "❌ app logs missing"; exit 1; }
         echo "✅ Logs found in S3 bucket"
 
-    # Destroy (disabled by default)
+    # Destroy (automatically always to avoid manual deletion)
     - name: Destroy infrastructure
-      if: always() 
+      if: always()
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        echo "🗑️ Destroying infrastructure for stage: ${{ github.event.inputs.stage }}"
+        echo "🗑️ Destroying infrastructure for stage: ${STAGE}"
         sleep 60
-        terraform destroy -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve \
-          -var "stage=${{ github.event.inputs.stage }}"
+        terraform destroy -var-file="${STAGE}_config.tfvars" -auto-approve \
+          -var "stage=${STAGE}"
 
     # Cleanup Terraform Workspace
     - name: Cleanup Terraform Workspace
-      if: always() 
+      if: always()
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
         terraform workspace select default
-        terraform workspace delete ${{ github.event.inputs.stage }}
+        terraform workspace delete ${STAGE}
