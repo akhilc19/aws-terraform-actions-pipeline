@@ -1,17 +1,20 @@
-name: Deploy to EC2
+name: EC2 Deploy 
 
 on:
   push:
     branches:
       - devops/a3
     tags:
-      - 'deploy-*'    # Matches tags like deploy-dev, deploy-qa, deploy-prod
+      - deploy-dev
+      - deploy-qa
+      - deploy-prod
+
   workflow_dispatch:
     inputs:
       stage:
-        description: 'Deployment stage (dev, qa, prod)'
+        description: "Select stage to deploy"
         required: true
-        default: 'dev'
+        default: dev
         type: choice
         options:
           - dev
@@ -20,67 +23,135 @@ on:
 
 env:
   AWS_REGION: ap-south-1
+  TF_WORKING_DIR: ./terraform
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Determine Stage
-      id: set_stage
-      run: |
-        STAGE_INPUT="${{ github.event.inputs.stage }}"
-        STAGE=""
-
-        if [[ "${GITHUB_REF}" == refs/tags/deploy-* ]]; then
-          STAGE="${GITHUB_REF#refs/tags/deploy-}"
-          echo "Tag trigger detected. Stage set to: $STAGE"
-        elif [[ -n "$STAGE_INPUT" ]]; then
-          STAGE="$STAGE_INPUT"
-          echo "Manual trigger detected. Stage set to: $STAGE"
-        else
-          echo "Branch trigger detected (main). Defaulting stage to dev."
-          STAGE="dev"
-        fi
-
-        # Validate stage
-        if [[ "$STAGE" != "dev" && "$STAGE" != "qa" && "$STAGE" != "prod" ]]; then
-          echo "Invalid stage: $STAGE. Must be dev, qa, or prod."
-          exit 1
-        fi
-
-        echo "STAGE=$STAGE" >> $GITHUB_ENV
-
-    # Checkout Code
+    # Checkout Repository
     - name: Checkout repository
       uses: actions/checkout@v4
 
     # Configure AWS Credentials
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+        aws-output: json
 
-    # Install Dependencies
-    - name: Install dependencies
+    # Install Terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    # Determin Stage - dev/prod/qa defaults to dev
+    # - name: Determine Stage
+    #   id: set_stage
+    #   run: |
+    #     if [[ "${GITHUB_REF}" == "refs/tags/deploy-dev" ]]; then
+    #       echo "STAGE=dev" >> $GITHUB_ENV
+    #     elif [[ "${GITHUB_REF}" == "refs/tags/deploy-qa" ]]; then
+    #       echo "STAGE=qa" >> $GITHUB_ENV
+    #     elif [[ "${GITHUB_REF}" == "refs/tags/deploy-prod" ]]; then
+    #       echo "STAGE=prod" >> $GITHUB_ENV
+    #     elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+    #       echo "STAGE=${{ github.event.inputs.stage }}" >> $GITHUB_ENV
+    #     else
+    #       echo "STAGE=dev" >> $GITHUB_ENV  # default fallback
+    #     fi
+
+    #     echo "🛠️ Deployment stage: $STAGE"
+
+    # Terraform Init & Workspace
+    - name: Terraform Init & Workspace
+      working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        sudo apt update
-        sudo apt install -y unzip curl terraform
+        terraform init
+        terraform workspace select ${{ github.event.inputs.stage }} || terraform workspace new ${{ github.event.inputs.stage }}
 
-    # Setup SSH Private Key
-    - name: Setup SSH Private Key
+    # Terraform Apply
+    - name: Terraform Apply
+      working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ec2_key.pem
-        chmod 400 ec2_key.pem
+        terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve \
+          -var "stage=${{ github.event.inputs.stage }}"
 
-    # Make deploy.sh executable
-    - name: Make deploy.sh executable
-      run: chmod +x scripts/deploy.sh
-
-    # Run deploy.sh with detected stage
-    - name: Run deploy.sh
+    # Output and inject EC2 IPs & S3 Bucket name to Github Env
+    - name: Get EC2s Public IPs & S3 Bucket Name
+      working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        export PRIVATE_KEY_PATH="./ec2_key.pem"
-        ./scripts/deploy.sh $STAGE
+        echo "Injecting terraform outputs to github environment"
+        # echo "INSTANCE_IP=$(terraform output -raw instance_public_ip)" >> $GITHUB_ENV
+        # echo "VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)" >> $GITHUB_ENV
+        # echo "S3_BUCKET=$(terraform output -raw s3_log_bucket)" >> $GITHUB_ENV
+        # Assign to local shell variables
+        INSTANCE_IP=$(terraform output -raw instance_public_ip)
+        VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
+        S3_BUCKET=$(terraform output -raw s3_log_bucket)
+
+        # Write to GitHub Actions ENV for later steps
+        echo "INSTANCE_IP=$INSTANCE_IP" >> $GITHUB_ENV
+        echo "VERIFIER_IP=$VERIFIER_IP" >> $GITHUB_ENV
+        echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
+
+        # Echo both for current step & confirmation
+        echo "📦 App IP (Shell): $INSTANCE_IP"
+        echo "🔑 Verifier IP (Shell): $VERIFIER_IP"
+        echo "🪣 S3 Bucket (Shell): $S3_BUCKET"
+
+
+    # Wait for App Initialization
+    - name: Wait for App Initialization
+      run: |
+        echo "⏳ Waiting 90 seconds for EC2 instances to initialize..."
+        sleep 90
+
+    # Validate App Health
+    - name: Validate App Health
+      run: |
+        echo "Checking app health at http://${{ env.INSTANCE_IP }}:80"
+        for i in {1..10}; do
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://$INSTANCE_IP:80)
+          if [[ "$STATUS" == "200" ]]; then
+            echo "✅ App is healthy (HTTP 200)"
+            exit 0
+          else
+            echo "Attempt $i: got HTTP $STATUS"
+            sleep 10
+          fi
+        done
+        echo "❌ App failed health check"
+        exit 1
+
+        echo -e "\n📦 Full Response from App:\n"
+        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
+        echo -e "\n"
+
+    # Verify Logs in S3
+    - name: Verify Logs in S3
+      run: |
+        echo "📦 Checking for logs in S3 bucket: $S3_BUCKET"
+        aws s3 ls s3://$S3_BUCKET/system/cloud-init.log || { echo "❌ system logs missing"; exit 1; }
+        aws s3 ls s3://$S3_BUCKET/app/my-app.log || { echo "❌ app logs missing"; exit 1; }
+        echo "✅ Logs found in S3 bucket"
+
+    # Destroy (disabled by default)
+    - name: Destroy infrastructure
+      if: always() 
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        echo "🗑️ Destroying infrastructure for stage: ${{ github.event.inputs.stage }}"
+        sleep 60
+        terraform destroy -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve \
+          -var "stage=${{ github.event.inputs.stage }}"
+
+    # Cleanup Terraform Workspace
+    - name: Cleanup Terraform Workspace
+      if: always() 
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        terraform workspace select default
+        terraform workspace delete ${{ github.event.inputs.stage }}
