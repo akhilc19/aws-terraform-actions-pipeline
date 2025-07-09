@@ -29,8 +29,8 @@ nohup java -jar target/*.jar --server.port=80 > /var/log/my-app.log 2>&1 &
 sleep 5
 
 # Upload Logs to S3
-aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/system/
-aws s3 cp /var/log/my-app.log s3://${s3_bucket_name}/app/
+aws s3 cp /var/log/cloud-init.log s3://${s3_bucket_name}/prod/system/
+aws s3 cp /var/log/my-app.log s3://${s3_bucket_name}/prod/app/
 
 # Shutdown after timeout
 sudo shutdown -h +${shutdown_minutes}
