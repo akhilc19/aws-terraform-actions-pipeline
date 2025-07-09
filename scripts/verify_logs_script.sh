@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Install AWS CLI and dependencies
-apt-get update -y
-apt-get install -y unzip curl
+# apt-get update -y
+# apt-get install -y unzip curl
 
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
+# curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+# unzip awscliv2.zip
+# sudo ./aws/install
 
 # Create directories for logs
 # cd /home/ubuntu
@@ -22,20 +22,34 @@ echo "Fetching logs from S3 Bucket: ${s3_bucket_name}"
 # sudo aws s3 sync s3://${s3_bucket_name} /mylogs/ 
 
 echo "Waiting for logs to appear in S3 bucket: ${s3_bucket_name}"
-sleep 100
-MAX_RETRIES=20
-RETRY_DELAY=30  # seconds
+sleep 60 # Its taking approx 60 seconds for app to run and logs to be sent in s3 from another ec2
 
-for ((i=1; i<=MAX_RETRIES; i++)); do
-  echo "Attempt $i: Syncing logs from S3..."
-  if sudo aws s3 sync s3://${s3_bucket_name} /mylogs; then
-    echo "Logs synced successfully on attempt $i"
-    break
-  else
-    echo "Attempt $i failed. Waiting $RETRY_DELAY seconds before retrying..."
-    sleep $RETRY_DELAY
-  fi
-done
+sudo aws s3 sync s3://${s3_bucket_name} /mylogs
+
+# MAX_RETRIES=20
+# RETRY_DELAY=30  # seconds
+
+# for ((i=1; i<=MAX_RETRIES; i++)); do
+#   echo "Attempt $i: Syncing logs from S3..."
+  
+#   if sudo aws s3 sync s3://${s3_bucket_name} /mylogs; then
+#     echo "S3 sync completed."
+
+#     # Check if both /mylogs/app and /mylogs/system exist and are not empty
+#     if [ -d "/mylogs/app" ] && [ -n "$(ls -A /mylogs/app 2>/dev/null)" ] && \
+#        [ -d "/mylogs/system" ] && [ -n "$(ls -A /mylogs/system 2>/dev/null)" ]; then
+#       echo "✅ Both 'app' and 'system' logs found on attempt $i."
+#       break
+#     else
+#       echo "⚠️ One or both directories missing or empty. Retrying..."
+#     fi
+
+#   else
+#     echo "❌ S3 sync failed. Retrying..."
+#   fi
+
+#   sleep $RETRY_DELAY
+# done
 
 
 
