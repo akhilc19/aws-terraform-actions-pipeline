@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Update system and install dependencies
-apt-get update -y
-apt-get install -y unzip git openjdk-21-jdk maven
+# apt-get update -y
+# apt-get install -y unzip git openjdk-21-jdk maven
 
-# Install AWS CLI v2
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
+# # Install AWS CLI v2
+# curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+# unzip awscliv2.zip
+# sudo ./aws/install
 
 
 # Set JAVA_HOME
