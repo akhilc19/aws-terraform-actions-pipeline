@@ -53,7 +53,13 @@ echo "Verified Public IP: $VERIFIER_IP"
 echo "Wait 100 seconds for verifier ec2 (read only) to pull the logs from s3 to local environment"
 sleep 100
 cd .. # to save logs at root level
-PRIVATE_KEY_PATH="/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem" #change this to your ssh private key path, also make sure to use `chmod 400` on your key before using
+if [ -n "$GITHUB_ACTIONS" ]; then
+  PRIVATE_KEY_PATH="./ec2_key.pem"
+else
+  PRIVATE_KEY_PATH="/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem"
+fi
+
+# PRIVATE_KEY_PATH="/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem" #change this to your ssh private key path, also make sure to use `chmod 400` on your key before using
 echo "trying to scp logs to local"
 scp -r -i "$PRIVATE_KEY_PATH" -o StrictHostKeyChecking=no ubuntu@$VERIFIER_IP:/mylogs/ .   #to pull logs from readonly ec2 to your local directory /mylogs/
 cd $TERRAFORM_DIR # to run destroy need to go to terraform directory
