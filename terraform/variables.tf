@@ -3,10 +3,10 @@ variable "aws_region" {
   description = "AWS Mumbai region"
 }
 variable "ami_id" {
-  # default     = "ami-0d03cb826412c6b0f"
-  # description = "AMI ID for Amazon Linux 2023"
-  default     = "ami-0f918f7e67a3323f0"
-  description = "AMI ID for Ubuntu 24"
+  # default     = "ami-0f918f7e67a3323f0"
+  #description = "AMI ID for Ubuntu 24"
+  default     = "ami-00cb641b494eae1e8" #my own ec2 ami with pre installed tools
+  description = "Using own custom ec2 ami with pre installed aws cli v2, java 21, git, maven, curl"
 }
 variable "instance_type" {
   description = "EC2 instance type"

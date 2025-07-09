@@ -1,6 +1,6 @@
-instance_type     = "t2.micro"
-key_name          = "ssh-key-ec2" #change this to your key-pair name
-ami_id            = "ami-0f918f7e67a3323f0"
+instance_type = "t2.micro"
+key_name      = "ssh-key-ec2" #change this to your key-pair name
+# ami_id            = "ami-0f918f7e67a3323f0"
 stage             = "prod"
 shutdown_minutes  = 25
 s3_bucket_name    = "techeazy-logs-dev-unique123ss" # Change this!
