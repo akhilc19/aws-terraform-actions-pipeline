@@ -161,6 +161,39 @@ jobs:
 
         echo "🎉 All required logs are present in S3"
 
+    # Print Logs from Verifier EC2
+    - name: Print Logs from Verifier EC2
+      run: |
+        echo "📄 Fetching logs from /mylogs/${STAGE} on verifier EC2"
+
+        # Retry SSH if EC2 not yet ready
+        for attempt in {1..5}; do
+          ssh -o StrictHostKeyChecking=no ubuntu@${VERIFIER_IP} "echo '✅ SSH to verifier successful for log fetch'" && break
+          echo "⏳ Verifier not ready for log fetch, retrying SSH (attempt $attempt)..."
+          sleep 15
+        done
+
+        # Print system log
+        ssh -o StrictHostKeyChecking=no ubuntu@${VERIFIER_IP} \
+        "if [ -f /mylogs/${STAGE}/system/cloud-init.log ]; then
+          echo '📄 ====== system/cloud-init.log ======'
+          cat /mylogs/${STAGE}/system/cloud-init.log | tail -n 20
+        else
+          echo '❌ system/cloud-init.log not found'
+        fi"
+
+        # Print app log
+        ssh -o StrictHostKeyChecking=no ubuntu@${VERIFIER_IP} \
+        "if [ -f /mylogs/${STAGE}/app/my-app.log ]; then
+          echo '📄 ====== app/my-app.log ======'
+          cat /mylogs/${STAGE}/app/my-app.log | tail -n 20
+        else
+          echo '❌ app/my-app.log not found'
+        fi"
+
+        echo "✅ Printed last 20 lines of logs from verifier EC2"
+
+
     # Destroy Infrastructure
     - name: Destroy Infrastructure
       if: always()
