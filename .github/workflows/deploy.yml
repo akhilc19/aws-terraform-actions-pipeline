@@ -68,71 +68,105 @@ jobs:
         terraform init
         terraform workspace select ${STAGE} || terraform workspace new ${STAGE}
 
-    # Terraform Apply
+    # Terraform Apply (Full Infra)
     - name: Terraform Apply
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
         terraform apply -var-file="${STAGE}_config.tfvars" -auto-approve \
           -var "stage=${STAGE}"
 
-    # Output and inject EC2 IPs & S3 Bucket name to Github Env
-    - name: Get EC2s Public IPs & S3 Bucket Name
+    # Get Outputs: App IP, Verifier IP, S3 Bucket
+    - name: Get Terraform Outputs
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        echo "Injecting terraform outputs to github environment"
         INSTANCE_IP=$(terraform output -raw instance_public_ip)
-        VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
         S3_BUCKET=$(terraform output -raw s3_log_bucket)
-
         echo "INSTANCE_IP=$INSTANCE_IP" >> $GITHUB_ENV
-        echo "VERIFIER_IP=$VERIFIER_IP" >> $GITHUB_ENV
         echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
-
-        echo "📦 App IP (Shell): $INSTANCE_IP"
-        echo "🔑 Verifier IP (Shell): $VERIFIER_IP"
-        echo "🪣 S3 Bucket (Shell): $S3_BUCKET"
+        echo "📦 App IP: $INSTANCE_IP"
+        echo "🪣 S3 Bucket: $S3_BUCKET"
 
     # Wait for App Initialization
     - name: Wait for App Initialization
       run: |
-        echo "⏳ Waiting 90 seconds for EC2 instances to initialize..."
+        echo "⏳ Waiting 90 seconds for app EC2 to initialize..."
         sleep 90
 
     # Validate App Health
     - name: Validate App Health
       run: |
-        echo -e "\n📦 Full Response from App:\n"
-        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
-        echo -e "\n"
-        echo "Checking app health at http://${{ env.INSTANCE_IP }}:80"
+        echo "🔎 Checking app health at http://${INSTANCE_IP}:80"
         for i in {1..10}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ env.INSTANCE_IP }}:80)
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${INSTANCE_IP}:80)
           if [[ "$STATUS" == "200" ]]; then
             echo "✅ App is healthy (HTTP 200)"
             exit 0
           else
-            echo "Attempt $i: got HTTP $STATUS"
+            echo "Attempt $i: HTTP $STATUS"
             sleep 10
           fi
         done
         echo "❌ App failed health check"
         exit 1
 
-    # Verify Logs in S3
-    - name: Verify Logs in S3
+    # Provision Verifier EC2
+    - name: Terraform Apply Verifier EC2
+      working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
-        echo "📦 Checking for logs in S3 bucket: $S3_BUCKET"
-        aws s3 ls s3://$S3_BUCKET/${STAGE}/system/cloud-init.log || { echo "❌ system logs missing"; exit 1; }
-        aws s3 ls s3://$S3_BUCKET/${STAGE}/app/my-app.log || { echo "❌ app logs missing"; exit 1; }
-        echo "✅ Logs found in S3 bucket"
+        terraform apply -var-file="${STAGE}_config.tfvars" \
+          -target=aws_instance.log_verifier -auto-approve \
+          -var "stage=${STAGE}"
 
-    # Destroy (automatically always to avoid manual deletion)
-    - name: Destroy infrastructure
+    # Get Verifier IP
+    - name: Get Verifier IP
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
+        echo "VERIFIER_IP=$VERIFIER_IP" >> $GITHUB_ENV
+        echo "🔑 Verifier IP: $VERIFIER_IP"
+
+    # Setup SSH Key for EC2 Access
+    - name: Setup SSH Key for EC2 Access
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    # Wait for Verifier EC2 Initialization
+    - name: Wait for Verifier EC2 Initialization
+      run: |
+        echo "⏳ Waiting 60 seconds for verifier EC2 to initialize..."
+        sleep 60
+
+    # SSH into Verifier EC2 and Validate Logs
+    - name: Validate Logs from Verifier EC2
+      run: |
+        echo "🔐 Validating logs in S3 from verifier EC2"
+
+        # Retry SSH if EC2 not yet ready
+        for attempt in {1..5}; do
+          ssh -o StrictHostKeyChecking=no ubuntu@${VERIFIER_IP} "echo '✅ SSH to verifier successful'" && break
+          echo "⏳ Verifier not ready, retrying SSH (attempt $attempt)..."
+          sleep 15
+        done
+
+        # Validate logs in S3
+        for log in system/cloud-init.log app/my-app.log; do
+          ssh -o StrictHostKeyChecking=no ubuntu@${VERIFIER_IP} \
+          "if aws s3 ls s3://${S3_BUCKET}/${STAGE}/$log > /dev/null 2>&1; then
+             echo '✅ Found: $log';
+           else
+             echo '❌ Missing: $log'; exit 1;
+           fi"
+        done
+
+        echo "🎉 All required logs are present in S3"
+
+    # Destroy Infrastructure
+    - name: Destroy Infrastructure
       if: always()
       working-directory: ${{ env.TF_WORKING_DIR }}
       run: |
         echo "🗑️ Destroying infrastructure for stage: ${STAGE}"
-        sleep 60
         terraform destroy -var-file="${STAGE}_config.tfvars" -auto-approve \
           -var "stage=${STAGE}"
 
