@@ -1,6 +1,6 @@
-# AWS EC2 Auto Deployment with Terraform & Shell Scripts
+# AWS EC2 Auto Deployment with Terraform & GitHub Actions
 
-This project automates the provisioning of an EC2 instance and the deployment of your application on AWS using Terraform and shell scripts. It supports different environments (Dev, Prod) through configuration files and deployment scripts.
+This project automates the provisioning of EC2 instances and the deployment of your application on AWS using **Terraform** and **GitHub Actions**. It supports different environments (Dev, Prod) via configuration files.
 
 ---
 
@@ -9,14 +9,18 @@ This project automates the provisioning of an EC2 instance and the deployment of
 ```
 tech_eazy_devops_git-user-9/
 ├── README.md                  # Project documentation
+├── .gitignore                 # Lists files to exclude from version control
+├── .github/
+│   └── workflows/
+│       └── deploy.yml         # GitHub Actions workflow for deployment
 ├── terraform/                 # Terraform configurations
 │   ├── main.tf                # Main Terraform configuration file
 │   ├── outputs.tf             # Defines Terraform outputs (e.g., EC2 public IP)
 │   ├── variables.tf           # Public variables file for EC2 and other details
 │   ├── dev_config.tfvars      # Variable values for 'Dev' environment
 │   ├── prod_config.tfvars     # Variable values for 'Prod' environment
-├── scripts/                   # Shell scripts for provisioning and deployments
-│   ├── deploy.sh              # Automates provisioning with Terraform
+├── scripts/                   # Shell scripts for configuration and log validation
+│   ├── deploy.sh              # [OBSOLETE] Legacy deployment script (replaced by deploy.yml)
 │   ├── dev_script.sh          # Dev-specific configuration script for EC2
 │   ├── prod_script.sh         # Production-specific script for EC2
 │   ├── verify_logs.sh         # Validates and uploads logs
@@ -25,162 +29,85 @@ tech_eazy_devops_git-user-9/
 │   │   └── my-app.log         # Main application log
 │   └── system/                # Tracks provisioning/system logs
 │       └── cloud-init.log     # Logs of initialization processes
-└── .gitignore                 # Lists files to exclude from version control
 ```
 
 ---
 
 ## ⚙️ **Prerequisites**
 
-Ensure the following tools and resources are configured before deploying:
+* **Fork this repository** – You must fork it to your own GitHub account so you can add secrets (you cannot add secrets to a repo you don’t own).
+* **AWS Account** with IAM permissions to provision EC2, S3, etc.
+* **GitHub Secrets**
 
-- **AWS Account** with IAM permissions for creating EC2, S3, and other resources.
-- **IAM User** with access keys for programmatic access.
-- **AWS CLI** installed and configured on your machine.
-- **Terraform** (version >= 1.0 recommended).
-- **Git** installed for version control.
-- An **EC2 Key Pair** set up in AWS Console for securely accessing instances (see [Key Pair Section](#ec2-key-pair-requirement)).
+  * `AWS_ACCESS_KEY_ID` – IAM user access key
+  * `AWS_SECRET_ACCESS_KEY` – IAM user secret key
+  * `SSH_PRIVATE_KEY` – Private key for SSH access to EC2 instances
+* Terraform installed (for local testing if required)
+* EC2 Key Pair configured in AWS and referenced in Terraform configs
 
 ---
 
-## 🔐 **AWS Credentials Setup**
+## 🔐 **How to Get SSH Private Key from .pem File**
 
-Terraform authenticates with AWS using your configured credentials.
+When you create an AWS EC2 Key Pair, AWS provides a `.pem` file. To use this in GitHub Actions, you must convert it to a format that can be stored as a secret.
 
-### Option 1: AWS CLI (Recommended)
+### Steps:
+
+1. **Generate the Key Pair in AWS Console** (download the `.pem` file)
+2. Open the `.pem` file in a text editor and copy its contents.
+3. Add it as a GitHub secret named `SSH_PRIVATE_KEY` in your forked repository.
+
+Example:
 
 ```bash
-aws configure
+cat path/to/your-key.pem
 ```
-Provide the following inputs:
-- AWS Access Key ID
-- AWS Secret Access Key
-- Default AWS region (e.g., `ap-south-1`)
-- Default output format (e.g., `json`)
 
-### Option 2: Environment Variables
+Copy the entire output (including `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----`) into the GitHub secret.
 
-Set environment variables explicitly:
+⚠️ Ensure your `.pem` file permissions are secure:
+
 ```bash
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=ap-south-1
+chmod 400 path/to/your-key.pem
 ```
 
 ---
 
-## EC2 Key Pair Requirement
+## 🚀 **Deployment Workflow**
 
-Ensure you have an EC2 Key Pair set up in the AWS Console. Update the key pair's name in these files:
+The deployment is managed via GitHub Actions.
 
-**`terraform/variables.tf`**
-```hcl
-variable "key_name" {
-  default = "your-key-name-here"
-}
-```
+### ✅ Trigger Methods
 
-**`terraform/dev_config.tfvars`**
-```hcl
-key_name = "your-key-name-here"
-```
+* **Push to Branch**: `devops/a3`
+* **Git Tags**: `deploy-dev` (for Dev), `deploy-prod` (for Prod)
+* **Manual Trigger**: Run from GitHub Actions → Select Stage (dev/prod)
 
-**`terraform/prod_config.tfvars`**
-```hcl
-key_name = "your-key-name-here"
-```
+### 📖 Overview of Workflow
 
-The Key Pair ensures secure SSH access to the instances.
+The workflow performs the following steps:
 
----
+1. **Checkout Repository** – Fetches the code from the repository.
+2. **Configure AWS Credentials** – Uses GitHub Secrets to authenticate with AWS.
+3. **Setup Terraform** – Installs Terraform and initializes configuration.
+4. **Determine Stage** – Sets the target environment (dev or prod) based on trigger type.
+5. **Provision App EC2 Instance (Write Access)** –
 
-## 🚀 **How to Deploy**
+   * Deploys the first EC2 instance with **write access to S3**.
+   * Installs required software (Java, Maven, Git, etc.).
+   * Pulls source code from the repository and builds the Maven application.
+   * Runs the application and pushes logs (system and app logs) to the S3 bucket.
+6. **Provision Verifier EC2 Instance (Read Access)** –
 
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/git-user-9/tech_eazy_devops_git-user-9.git
-cd tech_eazy_devops_git-user-9
-```
+   * Deploys a second EC2 instance with **read-only access to S3**.
+   * Uses AWS CLI to pull logs from the S3 bucket to the instance.
+7. **Log Validation via SSH** –
 
-### 2️⃣ Run the Deployment Script
-```bash
-./scripts/deploy.sh dev    # For Development Environment
-./scripts/deploy.sh prod   # For Production Environment
-```
-This will:
-- Apply Terraform configurations for selected environment
-- Output the public IP of the created EC2 instance
-- Upload logs to S3 automatically
-- Terminate the instance after 10-15 minutes if configured
+   * SSH into the Verifier EC2 instance.
+   * Validates that required logs exist in S3.
+   * Prints the last 20 lines of each log for inspection.
+8. **App Health Check** – Ensures the application is healthy (HTTP 200 response).
+9. **Destroy Infrastructure** – After validation, destroys all provisioned resources and cleans up Terraform workspaces.
 
-### 3️⃣ Access the Application
-Navigate to:
-```
-http://<ec2-public-ip>:80
-```
-
----
-
-## 🛠️ **Details of Automation**
-
-### Terraform Provisions:
-- **EC2 Instances** within the default VPC.
-- **Security Groups** with HTTP (80) and SSH (22) access.
-- **IAM Roles** for instances to access S3.
-
-### Shell Scripts:
-- Update operating system packages.
-- Install required tools such as Java, Git, Maven, AWS CLI, etc.
-- Clone, build, and run the application on Port 80.
-- Upload logs to the S3 bucket.
-
----
-
-## Note on Pulling Logs from EC2 to Local
-
-To enable **log pulling from EC2 to your local machine,** follow these steps:
-
-1. **Uncomment Lines in the Script:**
-   *This step is only if you want logs to be fetched from s3 to your local directory*
-   Locate the following lines in your deployment script between **lines 52–59** and uncomment them:
-
-   ```bash
-   # Wait a while for logs to upload
-   sleep 100
-   cd .. # Save logs at the root level
-   PRIVATE_KEY_PATH="/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem" # Change this to your SSH private key path and ensure `chmod 400` on your key
-   echo "Trying to SCP logs to local"
-   scp -r -i "$PRIVATE_KEY_PATH" ubuntu@$VERIFIER_IP:/mylogs/ . # Pull logs from EC2 to /mylogs/ in your local directory
-   cd $TERRAFORM_DIR # Return to Terraform directory for destroy commands
-   ```
-
-2. **Specify Your Private Key Path:**
-   - Replace the placeholder `"/Users/default/CS/DevOps/AWS/ssh-key-ec2.pem"` under the variable `PRIVATE_KEY_PATH` with the actual path to your EC2 key's private key file.
-   - Before using, ensure the private key has the appropriate permissions by running:
-     ```bash
-     chmod 400 /path/to/your/private-key.pem
-     ```
-
-3. **Save the logs locally:**
-   After successfully setting this up, the script will pull logs from `/mylogs/` on your EC2 instance to a local `/mylogs/` directory at the repository's root level.
-
-This addition ensures your logs are saved to your local environment automatically.
-
-
-
----
-
-## 💬 **FAQs**
-
-**Q: How can I deploy in a different region?**  
-Modify the `aws_region` variable in the `terraform/variables.tf` file and update it in the `.tfvars` files.
-
-**Q: What happens if deployment fails?**  
-Terraform maintains a state file. Retry by running the deployment script again.
-
-**Q: Where can I find the logs?**  
-Logs are stored in the `mylogs/` directory or uploaded to the configured S3 bucket.
-
----
-
+This workflow fully automates the lifecycle: provisioning, deployment, validation, and cleanup, ensuring no manual intervention is needed during the process.
 
