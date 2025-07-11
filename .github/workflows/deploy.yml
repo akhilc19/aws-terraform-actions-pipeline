@@ -193,6 +193,14 @@ jobs:
 
         echo "✅ Printed last 20 lines of logs from verifier EC2"
 
+    # # Verify Logs in S3 using AWS CLI
+    # - name: Verify Logs in S3
+    #   run: |
+    #     echo "📦 Checking for logs in S3 bucket: $S3_BUCKET"
+    #     aws s3 ls s3://$S3_BUCKET/${STAGE}/system/cloud-init.log || { echo "❌ system logs missing"; exit 1; }
+    #     aws s3 ls s3://$S3_BUCKET/${STAGE}/app/my-app.log || { echo "❌ app logs missing"; exit 1; }
+    #     echo "✅ Logs found in S3 bucket"
+
 
     # Destroy Infrastructure
     - name: Destroy Infrastructure
