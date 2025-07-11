@@ -16,7 +16,7 @@ tech_eazy_devops_git-user-9/
 ├── terraform/                 # Terraform configurations
 │   ├── main.tf                # Main Terraform configuration file
 │   ├── outputs.tf             # Defines Terraform outputs (e.g., EC2 public IP)
-│   ├── variables.tf           # Public variables file for EC2 and other details
+│   ├── variables.tf           # Common variables (e.g., region, key pair name)
 │   ├── dev_config.tfvars      # Variable values for 'Dev' environment
 │   ├── prod_config.tfvars     # Variable values for 'Prod' environment
 ├── scripts/                   # Shell scripts for configuration and log validation
@@ -44,6 +44,38 @@ tech_eazy_devops_git-user-9/
   * `SSH_PRIVATE_KEY` – Private key for SSH access to EC2 instances
 * Terraform installed (for local testing if required)
 * EC2 Key Pair configured in AWS and referenced in Terraform configs
+
+---
+
+## 🔑 **Step: Configure Terraform Variables**
+
+Before triggering deployment, update the Terraform configuration files for your AWS environment:
+
+1. Open `terraform/variables.tf`
+2. Set the default values for common variables like EC2 Key Pair name:
+
+```hcl
+variable "key_name" {
+  default = "your-ec2-keypair-name" # Set your AWS Key Pair name
+}
+```
+
+3. Edit `terraform/dev_config.tfvars` and `terraform/prod_config.tfvars`:
+
+* Example (`dev_config.tfvars`):
+
+```hcl
+key_name      = "your-ec2-keypair-name"
+```
+
+* Example (`prod_config.tfvars`):
+
+```hcl
+key_name      = "your-ec2-keypair-name"
+```
+
+⚠️ Ensure your EC2 Key Pair exists in the selected AWS region. 
+*ap-south-1 (Mumbai) is being used by default in this project, so kindly create a ec2 key pair on this region for smoother experience during execution. Otherwise kindly change ap-south-1 at all places to your preferred region*
 
 ---
 
@@ -83,31 +115,70 @@ The deployment is managed via GitHub Actions.
 * **Git Tags**: `deploy-dev` (for Dev), `deploy-prod` (for Prod)
 * **Manual Trigger**: Run from GitHub Actions → Select Stage (dev/prod)
 
+---
+
+#### 🏷️ **Trigger Deployment via Git Tags**
+
+To deploy to **Dev** or **Prod**, create and push the appropriate Git tag:
+
+*⚠️ Make sure your working directory is clean (git status) before creating tags to avoid pushing unwanted changes.*
+
+##### For Dev Environment:
+
+```bash
+git tag deploy-dev
+git push origin deploy-dev
+```
+
+##### For Prod Environment:
+
+```bash
+git tag deploy-prod
+git push origin deploy-prod
+```
+
+The GitHub Actions workflow will automatically detect the tag and deploy to the respective environment.
+
+---
+
+---
+
 ### 📖 Overview of Workflow
 
 The workflow performs the following steps:
 
 1. **Checkout Repository** – Fetches the code from the repository.
+
 2. **Configure AWS Credentials** – Uses GitHub Secrets to authenticate with AWS.
+
 3. **Setup Terraform** – Installs Terraform and initializes configuration.
+
 4. **Determine Stage** – Sets the target environment (dev or prod) based on trigger type.
-5. **Provision App EC2 Instance (Write Access)** –
+
+5. **Provision App EC2 Instance (Write Access)**
 
    * Deploys the first EC2 instance with **write access to S3**.
    * Installs required software (Java, Maven, Git, etc.).
    * Pulls source code from the repository and builds the Maven application.
    * Runs the application and pushes logs (system and app logs) to the S3 bucket.
-6. **Provision Verifier EC2 Instance (Read Access)** –
+
+6. **Provision Verifier EC2 Instance (Read Access)**
 
    * Deploys a second EC2 instance with **read-only access to S3**.
    * Uses AWS CLI to pull logs from the S3 bucket to the instance.
-7. **Log Validation via SSH** –
+
+7. **Log Validation via SSH**
 
    * SSH into the Verifier EC2 instance.
    * Validates that required logs exist in S3.
    * Prints the last 20 lines of each log for inspection.
+
 8. **App Health Check** – Ensures the application is healthy (HTTP 200 response).
+
 9. **Destroy Infrastructure** – After validation, destroys all provisioned resources and cleans up Terraform workspaces.
 
+
 This workflow fully automates the lifecycle: provisioning, deployment, validation, and cleanup, ensuring no manual intervention is needed during the process.
+
+---
 

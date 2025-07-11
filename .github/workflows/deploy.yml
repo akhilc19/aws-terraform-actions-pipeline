@@ -83,6 +83,7 @@ jobs:
         S3_BUCKET=$(terraform output -raw s3_log_bucket)
         echo "INSTANCE_IP=$INSTANCE_IP" >> $GITHUB_ENV
         echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
+        
         echo "📦 App IP: $INSTANCE_IP"
         echo "🪣 S3 Bucket: $S3_BUCKET"
 
@@ -95,14 +96,17 @@ jobs:
     # Validate App Health
     - name: Validate App Health
       run: |
-        echo "🔎 Checking app health at http://${INSTANCE_IP}:80"
+        echo -e "\n📦 Full Response from App:\n"
+        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
+        echo -e "\n"
+        echo "Checking app health at http://${{ env.INSTANCE_IP }}:80"
         for i in {1..10}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${INSTANCE_IP}:80)
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ env.INSTANCE_IP }}:80)
           if [[ "$STATUS" == "200" ]]; then
             echo "✅ App is healthy (HTTP 200)"
             exit 0
           else
-            echo "Attempt $i: HTTP $STATUS"
+            echo "Attempt $i: got HTTP $STATUS"
             sleep 10
           fi
         done
