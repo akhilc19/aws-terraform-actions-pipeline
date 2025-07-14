@@ -35,8 +35,10 @@ tech_eazy_devops_git-user-9/
 
 ## ⚙️ **Prerequisites**
 
-* **Fork this repository** – You must fork it to your own GitHub account so you can add secrets (you cannot add secrets to a repo you don’t own).
+* **Fork this repository** – You must fork it to your own GitHub account so you can add secrets (you cannot add secrets to a repo you don't own).
+
 * **AWS Account** with IAM permissions to provision EC2, S3, etc.
+
 * **GitHub Secrets**
 
   * `AWS_ACCESS_KEY_ID` – IAM user access key
@@ -44,6 +46,41 @@ tech_eazy_devops_git-user-9/
   * `SSH_PRIVATE_KEY` – Private key for SSH access to EC2 instances
 * Terraform installed (for local testing if required)
 * EC2 Key Pair configured in AWS and referenced in Terraform configs
+
+---
+
+## 🔒 **Private Repository Setup for Production Config**
+
+For enhanced security, production configuration should be stored in a separate private repository:
+
+### **Step 1: Create Private Repository**
+
+1. Create a new **private repository** on GitHub (e.g., `your-username/terraform-prod-configs`)
+2. Copy the `prod_config.tfvars` file from `./terraform/prod_config.tfvars` in this repository
+3. Add the `prod_config.tfvars` file to your private repository
+
+### **Step 2: Generate Personal Access Token (PAT)**
+
+1. Go to GitHub Settings → Developer settings → Personal Access Tokens → Tokens (classic)
+2. Generate a new token with **repo** access permissions
+3. Copy the generated token for use in GitHub Secrets
+
+### **Step 3: Configure Additional GitHub Secrets**
+
+Add these secrets to your forked repository:
+
+* **`PRIVATE_REPO`** – URL of your private repository
+  ```
+  github.com/your-username/terraform-prod-configs
+  ```
+  (note: do not keep https:// in repo link above)
+
+* **`PRIVATE_REPO_KEY`** – Personal Access Token with repo access
+  ```
+  ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  ```
+
+⚠️ **Important**: Replace `your-username` with your actual GitHub username and ensure the private repository contains your production Terraform variables.
 
 ---
 
@@ -177,8 +214,6 @@ The workflow performs the following steps:
 
 9. **Destroy Infrastructure** – After validation, destroys all provisioned resources and cleans up Terraform workspaces.
 
-
 This workflow fully automates the lifecycle: provisioning, deployment, validation, and cleanup, ensuring no manual intervention is needed during the process.
 
 ---
-
