@@ -3,7 +3,7 @@ name: EC2 Deploy
 on:
   push:
     branches:
-      - devops/a4
+      - devops/a5
     tags:
       - deploy-dev
       - deploy-prod
@@ -107,11 +107,11 @@ jobs:
     - name: Validate App Health
       run: |
         echo -e "\n📦 Full Response from App:\n"
-        curl -s http://${{ env.INSTANCE_IP }}:80 || echo "❌ Failed to get response"
+        curl -s http://${{ env.INSTANCE_IP }}:80/hello || echo "❌ Failed to get response"
         echo -e "\n"
-        echo "Checking app health at http://${{ env.INSTANCE_IP }}:80"
+        echo "Checking app health at http://${{ env.INSTANCE_IP }}:80/hello"
         for i in {1..10}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ env.INSTANCE_IP }}:80)
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ env.INSTANCE_IP }}:80/hello)
           if [[ "$STATUS" == "200" ]]; then
             echo "✅ App is healthy (HTTP 200)"
             exit 0
@@ -122,6 +122,14 @@ jobs:
         done
         echo "❌ App failed health check"
         exit 1
+
+      
+    # Setup SSH Key for EC2 Access
+    - name: Setup SSH Key for EC2 Access
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
 
     # Provision Verifier EC2
     - name: Terraform Apply Verifier EC2
@@ -137,12 +145,6 @@ jobs:
         VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
         echo "VERIFIER_IP=$VERIFIER_IP" >> $GITHUB_ENV
         echo "🔑 Verifier IP: $VERIFIER_IP"
-
-    # Setup SSH Key for EC2 Access
-    - name: Setup SSH Key for EC2 Access
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     # Wait for Verifier EC2 Initialization
     - name: Wait for Verifier EC2 Initialization
@@ -199,6 +201,23 @@ jobs:
         fi"
 
         echo "✅ Printed last 20 lines of logs from verifier EC2"
+
+    # Inject ERROR/EXCEPTION into App Log
+    - name: Inject ERROR/EXCEPTION into App Log via SSH
+      run: |
+        echo "🔐 Injecting fake error/exception logs into /var/log/my-app.log on App EC2"
+        for attempt in {1..5}; do
+          ssh -o StrictHostKeyChecking=no ubuntu@${INSTANCE_IP} "echo '✅ SSH to App EC2 successful'" && break
+          echo "⏳ App EC2 not ready for SSH (attempt $attempt)..."
+          sleep 15
+        done
+
+        ssh -o StrictHostKeyChecking=no ubuntu@${INSTANCE_IP} <<EOF
+          echo "Error: Simulated failure on \$(date)" >> /var/log/my-app.log
+          echo "Exception: Simulated exception on \$(date)" >> /var/log/my-app.log
+        EOF
+
+        echo "✅ Injected fake error/exception logs into /var/log/my-app.log"
 
     # Destroy Infrastructure
     - name: Destroy Infrastructure

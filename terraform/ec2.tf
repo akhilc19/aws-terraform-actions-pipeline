@@ -44,6 +44,7 @@ resource "aws_instance" "app" {
     aws_region       = var.aws_region
     repo_url         = var.repo_url
     shutdown_minutes = var.shutdown_minutes
+    cw_agent_config_json  = file("${path.module}/cloudwatch-configs/${var.stage}_cw_agent_config.json")
   })
 
   tags = {

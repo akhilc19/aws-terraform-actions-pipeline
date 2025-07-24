@@ -5,7 +5,8 @@ variable "aws_region" {
 variable "ami_id" {
   # default     = "ami-0f918f7e67a3323f0"
   #description = "AMI ID for Ubuntu 24"
-  default     = "ami-00cb641b494eae1e8" #my own ec2 ami with pre installed tools
+  # default     = "ami-00cb641b494eae1e8" #my own ec2 ami with pre installed tools
+  default     = "ami-08bba0fcdb7376fa7"
   description = "Using own custom ec2 ami with pre installed aws cli v2, java 21, git, maven, curl"
 }
 variable "instance_type" {
@@ -20,7 +21,7 @@ variable "stage" {
   description = "Environment stage - Dev or Prod"
 }
 variable "repo_url" {
-  default     = "https://github.com/techeazy-consulting/techeazy-devops"
+  default     = "https://github.com/Trainings-TechEazy/test-repo-for-devops"
   description = "GitHub repo to deploy"
 }
 variable "s3_bucket_name" {
@@ -41,4 +42,9 @@ variable "verifier_lifetime" {
   description = "Shutdown timer for verifier instance"
   type        = number
   default     = 25
+}
+variable "alert_email" {
+  description = "Email to send alerts"
+  type        = string
+  default     = "akhilc0101@outlook.com"
 }

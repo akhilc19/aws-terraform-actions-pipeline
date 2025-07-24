@@ -31,11 +31,11 @@ sleep 200
 RAW_INSTANCE_IP=$(terraform output -raw instance_public_ip)
 
 echo -e "\n"
-echo "[+] Testing app on http://$RAW_INSTANCE_IP:80"
+echo "[+] Testing app on http://$RAW_INSTANCE_IP:80/hello"
 echo -e "\n"
 
 echo -e "\n"
-curl "http://$RAW_INSTANCE_IP:80"
+curl "http://$RAW_INSTANCE_IP:80/hello"
 echo -e "\n"
 echo -e "\n"
 
@@ -46,7 +46,7 @@ terraform apply -var-file="$CONFIG_FILE" -target=aws_instance.log_verifier -auto
 VERIFIER_IP=$(terraform output -raw verifier_instance_public_ip)
 
 
-echo "Verified Public IP: $VERIFIER_IP"
+echo "Verifier instance Public IP: $VERIFIER_IP"
 
 
 # #To verify and pull logs from ec2 to local.
@@ -65,8 +65,8 @@ curl "http://$RAW_INSTANCE_IP:80"
 echo -e "\n"
 echo -e "\n"
 
-echo "Terraform destroy will run after 2 minutes..."
+echo "Terraform destroy will run after 10 minutes..."
 echo "You can press ctrl+c and do it earlier as well"
-sleep 120
+sleep 600
 
 terraform destroy -var-file="$CONFIG_FILE" -auto-approve
