@@ -94,3 +94,9 @@ resource "aws_iam_instance_profile" "ec2_instance_profile_b" {
   name = "${var.stage}_writeonly_instance_profile"
   role = aws_iam_role.role_b_uploader.name
 }
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_logs_attach" {
+  role       = aws_iam_role.role_b_uploader.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
